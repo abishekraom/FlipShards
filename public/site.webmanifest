@@ -1,7 +1,7 @@
 {
   "name": "FlipShards",
   "short_name": "FlipShards",
-  "description": "Live CoflNet-powered Hypixel SkyBlock shard fusion profit calculator.",
+  "description": "Official Hypixel Bazaar snapshot-powered SkyBlock shard fusion profit calculator.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -75,8 +75,7 @@ const readProduct = (
 ): ShardPrice | null => {
   if (!isPlainRecord(product)) return null;
 
-  const productId = product.product_id;
-  if (productId !== undefined && productId !== itemTag) return null;
+  if (product.product_id !== itemTag) return null;
 
   const quickStatus = product.quick_status;
   if (!isPlainRecord(quickStatus) || quickStatus.productId !== itemTag) return null;

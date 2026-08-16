@@ -567,7 +567,7 @@ export const ProfitApp = () => {
 
       setSnapshotState((current) => applySnapshotReport(current, report));
       setSourceLabel(formatSnapshotLabel(report));
-      setLoadingMessage(report.coverage.loaded < report.coverage.expected ? "Rainbug is unavailable in this official snapshot." : "");
+      setLoadingMessage(report.coverage.loaded < report.coverage.expected ? "Snapshot coverage is partial; unavailable or malformed products were excluded." : "");
     } catch (error) {
       if (!isCurrentSnapshotRequest(loadSequenceRef.current, loadSequence)) return;
       const message = error instanceof HypixelSnapshotError ? error.message : "Unable to load the Hypixel Bazaar snapshot";
@@ -712,7 +712,7 @@ export const ProfitApp = () => {
               <div className="font-medium text-stone-200">{sourceLabel}</div>
               {snapshotState.coverage && (
                 <div className="mt-1 text-xs text-stone-500">
-                  Coverage: {snapshotState.coverage.loaded}/{snapshotState.coverage.expected} loaded, {snapshotState.coverage.missing} missing, {snapshotState.coverage.malformed} malformed.
+                  Coverage: {snapshotState.coverage.expected} expected, {snapshotState.coverage.matched} matched, {snapshotState.coverage.loaded} loaded, {snapshotState.coverage.missing} missing, {snapshotState.coverage.malformed} malformed.
                 </div>
               )}
               {snapshotState.lastUpdatedMs !== null && (

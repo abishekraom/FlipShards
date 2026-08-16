@@ -107,6 +107,20 @@ test("counts malformed products and keeps only valid compact records", () => {
   assert.deepEqual(Object.keys(report.prices), ["R4"]);
 });
 
+test("requires the official top-level product identity", () => {
+  const book = createRecipeBook(3);
+  const payload = createPayload(book, [RAINBUG_TAG]);
+  const product = payload.products.SHARD_TEST_001 as { product_id?: string };
+  delete product.product_id;
+
+  const report = buildHypixelSnapshot(book, payload);
+
+  assert.equal(report.coverage.matched, 2);
+  assert.equal(report.coverage.loaded, 1);
+  assert.equal(report.coverage.malformed, 1);
+  assert.equal(report.prices.R1, undefined);
+});
+
 test("rejects invalid numeric values per product and never converts them to zero", () => {
   const book = createRecipeBook(6);
   const payload = createPayload(book, [RAINBUG_TAG]);
