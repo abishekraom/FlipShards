@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { AlertTriangle, ArrowDownUp, BarChart3, Calculator, Check, ChevronDown, RefreshCw, ShieldCheck, TreePine } from "lucide-react";
 import { fetchHypixelShardPrices, HypixelSnapshotError } from "./hypixel";
-import { applySnapshotFailure, applySnapshotReport, initialSnapshotState, isCurrentSnapshotRequest } from "./snapshot-state";
+import { applySnapshotFailure, applySnapshotReport, initialSnapshotState, runCurrentSnapshotRequest } from "./snapshot-state";
 import { formatCoins, formatPercent, formatQuantity } from "./format";
 import { ProfitOptimizer, rankProfits } from "./optimizer";
 import { normalizeFusionData } from "./recipes";
@@ -561,25 +561,26 @@ export const ProfitApp = () => {
     setSourceLabel("Refreshing Hypixel Bazaar snapshot...");
     setLoadingMessage("Loading Hypixel Bazaar snapshot...");
 
-    try {
-      const report = await fetchHypixelShardPrices(recipeBook, controller.signal);
-      if (!isCurrentSnapshotRequest(loadSequenceRef.current, loadSequence)) return;
-
-      setSnapshotState((current) => applySnapshotReport(current, report));
-      setSourceLabel(formatSnapshotLabel(report));
-      setLoadingMessage(report.coverage.loaded < report.coverage.expected ? "Snapshot coverage is partial; unavailable or malformed products were excluded." : "");
-    } catch (error) {
-      if (!isCurrentSnapshotRequest(loadSequenceRef.current, loadSequence)) return;
-      const message = error instanceof HypixelSnapshotError ? error.message : "Unable to load the Hypixel Bazaar snapshot";
-      setSnapshotState((current) => applySnapshotFailure(current, message));
-      setSourceLabel("Hypixel Bazaar snapshot unavailable or stale");
-      setLoadingMessage(message);
-    } finally {
-      if (isCurrentSnapshotRequest(loadSequenceRef.current, loadSequence)) {
+    await runCurrentSnapshotRequest({
+      requestSequence: loadSequence,
+      getCurrentSequence: () => loadSequenceRef.current,
+      request: () => fetchHypixelShardPrices(recipeBook, controller.signal),
+      onSuccess: (report) => {
+        setSnapshotState((current) => applySnapshotReport(current, report));
+        setSourceLabel(formatSnapshotLabel(report));
+        setLoadingMessage(report.coverage.loaded < report.coverage.expected ? "Snapshot coverage is partial; unavailable or malformed products were excluded." : "");
+      },
+      onFailure: (error) => {
+        const message = error instanceof HypixelSnapshotError ? error.message : "Unable to load the Hypixel Bazaar snapshot";
+        setSnapshotState((current) => applySnapshotFailure(current, message));
+        setSourceLabel("Hypixel Bazaar snapshot unavailable or stale");
+        setLoadingMessage(message);
+      },
+      onSettled: () => {
         requestControllerRef.current = null;
         setIsRefreshing(false);
-      }
-    }
+      },
+    });
   }, [recipeBook]);
 
   useEffect(() => {

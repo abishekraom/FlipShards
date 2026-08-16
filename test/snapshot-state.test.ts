@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildHypixelSnapshot } from "../src/profit/hypixel";
+import { buildHypixelSnapshot, type SnapshotLoadReport } from "../src/profit/hypixel";
 import {
   applySnapshotFailure,
   applySnapshotReport,
   initialSnapshotState,
-  isCurrentSnapshotRequest,
+  runCurrentSnapshotRequest,
+  type SnapshotState,
 } from "../src/profit/snapshot-state";
 import { clonePayload, createPayload, createRecipeBook, RAINBUG_TAG } from "./helpers";
 
@@ -54,10 +55,64 @@ test("failed first load remains unavailable with no prices", () => {
   assert.equal(state.coverage, null);
 });
 
-test("a superseded request cannot commit its result", () => {
-  const firstRequest = 1;
-  const secondRequest = 2;
+test("an older response cannot mutate presentation state after a newer response commits", async () => {
+  const book = createRecipeBook(3);
+  const olderReport = buildHypixelSnapshot(book, createPayload(book));
+  const newerReport = buildHypixelSnapshot(book, createPayload(book, [RAINBUG_TAG, "SHARD_TEST_002"]));
+  let resolveOlder!: (report: SnapshotLoadReport) => void;
+  let resolveNewer!: (report: SnapshotLoadReport) => void;
+  const olderResponse = new Promise<SnapshotLoadReport>((resolve) => { resolveOlder = resolve; });
+  const newerResponse = new Promise<SnapshotLoadReport>((resolve) => { resolveNewer = resolve; });
+  let currentSequence = 0;
+  let view: {
+    snapshot: SnapshotState;
+    sourceLabel: string;
+    loadingMessage: string;
+    isRefreshing: boolean;
+  } = {
+    snapshot: initialSnapshotState,
+    sourceLabel: "unavailable",
+    loadingMessage: "",
+    isRefreshing: false,
+  };
 
-  assert.equal(isCurrentSnapshotRequest(secondRequest, firstRequest), false);
-  assert.equal(isCurrentSnapshotRequest(secondRequest, secondRequest), true);
+  const beginRequest = (response: Promise<SnapshotLoadReport>, label: string) => {
+    const requestSequence = currentSequence + 1;
+    currentSequence = requestSequence;
+    view = { ...view, sourceLabel: `loading ${label}`, loadingMessage: `loading ${label}`, isRefreshing: true };
+    return runCurrentSnapshotRequest({
+      requestSequence,
+      getCurrentSequence: () => currentSequence,
+      request: () => response,
+      onSuccess: (report) => {
+        view = { snapshot: applySnapshotReport(view.snapshot, report), sourceLabel: `${label} ready`, loadingMessage: "", isRefreshing: view.isRefreshing };
+      },
+      onFailure: (error) => {
+        view = { snapshot: applySnapshotFailure(view.snapshot, String(error)), sourceLabel: `${label} failed`, loadingMessage: String(error), isRefreshing: view.isRefreshing };
+      },
+      onSettled: () => {
+        view = { ...view, isRefreshing: false };
+      },
+    });
+  };
+
+  const olderRun = beginRequest(olderResponse, "older");
+  const newerRun = beginRequest(newerResponse, "newer");
+  resolveNewer(newerReport);
+  await newerRun;
+
+  assert.strictEqual(view.snapshot.prices, newerReport.prices);
+  assert.strictEqual(view.snapshot.coverage, newerReport.coverage);
+  assert.equal(view.sourceLabel, "newer ready");
+  assert.equal(view.loadingMessage, "");
+  assert.equal(view.isRefreshing, false);
+
+  resolveOlder(olderReport);
+  await olderRun;
+
+  assert.strictEqual(view.snapshot.prices, newerReport.prices);
+  assert.strictEqual(view.snapshot.coverage, newerReport.coverage);
+  assert.equal(view.sourceLabel, "newer ready");
+  assert.equal(view.loadingMessage, "");
+  assert.equal(view.isRefreshing, false);
 });

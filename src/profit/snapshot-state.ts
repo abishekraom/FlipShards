@@ -36,4 +36,31 @@ export const applySnapshotFailure = (state: SnapshotState, errorMessage: string)
   errorMessage,
 });
 
-export const isCurrentSnapshotRequest = (currentSequence: number, requestSequence: number) => currentSequence === requestSequence;
+interface CurrentSnapshotRequestOptions<T> {
+  requestSequence: number;
+  getCurrentSequence: () => number;
+  request: () => Promise<T>;
+  onSuccess: (value: T) => void;
+  onFailure: (error: unknown) => void;
+  onSettled: () => void;
+}
+
+export const runCurrentSnapshotRequest = async <T>({
+  requestSequence,
+  getCurrentSequence,
+  request,
+  onSuccess,
+  onFailure,
+  onSettled,
+}: CurrentSnapshotRequestOptions<T>): Promise<void> => {
+  try {
+    const value = await request();
+    if (getCurrentSequence() !== requestSequence) return;
+    onSuccess(value);
+  } catch (error) {
+    if (getCurrentSequence() !== requestSequence) return;
+    onFailure(error);
+  } finally {
+    if (getCurrentSequence() === requestSequence) onSettled();
+  }
+};
