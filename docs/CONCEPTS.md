@@ -24,15 +24,13 @@ FlipShards normalizes each recipe into:
 
 ## Market Data
 
-Market data comes from one manual browser request to the official Hypixel Bazaar snapshot endpoint:
+Market data comes from the official Hypixel Bazaar snapshot endpoint:
 
 ```text
 https://api.hypixel.net/v2/skyblock/bazaar
 ```
 
-The adapter maps official order-side values into the app's four price concepts and two current action-side volumes. It also maps `sellMovingWeek` and `buyMovingWeek` to explicit `buyActivity7d` and `sellActivity7d` fields. These are official seven-day activity signals, not CoflNet averages, and the existing risk thresholds are retained only as a provisional heuristic.
-
-The response timestamp is shown with coverage. A valid partial snapshot is accepted, so a currently missing item such as Rainbug is unavailable rather than assigned a zero price. A failed refresh retains the last valid in-memory snapshot and marks it stale; a first-load failure remains unavailable. No snapshot history is persisted.
+The app loads one snapshot after the fusion catalog is ready and supports manual reloads. See [Pricing And Profit](PRICING_AND_PROFIT.md) for the authoritative field mapping and activity heuristic, and [Architecture](ARCHITECTURE.md) for validation, coverage, atomic replacement, and stale-state behavior.
 
 Rarity and type filters come from the local shard metadata, so they do not require an extra API.
 

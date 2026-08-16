@@ -2,7 +2,7 @@
 
 FlipShards is a standalone Hypixel SkyBlock shard fusion profit calculator.
 
-It loads one official Hypixel Bazaar snapshot on demand, combines it with shard fusion recipe data, and ranks opportunities by profit, ROI, volume, and risk. It also includes a custom craft calculator for planning exact output quantities.
+It loads one official Hypixel Bazaar snapshot after the fusion catalog is ready, supports manual reloads, and ranks opportunities by profit, ROI, volume, and risk. It also includes a custom craft calculator for planning exact output quantities.
 
 ## Credits
 
@@ -13,7 +13,7 @@ FlipShards is a separate project and is not affiliated with, endorsed by, or mai
 
 ## Features
 
-- Manual official Hypixel Bazaar snapshot loading with no API key or token in the client.
+- One official Hypixel Bazaar snapshot request on initial load and on each manual reload, with no API key or token in the client.
 - Snapshot-only behavior: no timer, retry loop, persistent history, or CoflNet fallback.
 - Coverage and stale/unavailable status for partial or failed snapshots.
 - Fusion-aware optimizer that compares direct Bazaar acquisition against recursive shard fusion.

@@ -41,6 +41,12 @@ pnpm run build
 pnpm exec tsc -b
 ```
 
+## Test
+
+```sh
+pnpm test
+```
+
 ## Lint
 
 ```sh
@@ -58,7 +64,7 @@ A valid partial snapshot is usable and reports expected, matched, loaded, missin
 If the app stays unavailable:
 
 - confirm `public/fusion-data.json` loaded
-- inspect the snapshot status for the safe error category
+- inspect the snapshot status for the safe error message
 - inspect browser Network requests for HTTP, JSON, schema, timeout, or CORS failures
 
 If the table is empty:
@@ -78,7 +84,7 @@ If prices look reversed:
 Run a production-equivalent local preview and compare it with the deployed app using the same browser, viewport, timezone, and static graph revision. Record pass/fail and the official snapshot timestamp. Live numbers need not equal the old source because source semantics and timestamps differ; fixed fixtures must match exactly.
 
 - Static graph: same 321 SkyShards catalog, names, recipes, fusion and craft trees.
-- Workflow: no token gate, one official request on a cold load, manual reload only.
+- Workflow: no token gate, one official request on initial load, then manual reload only.
 - Modes: `BUY_ORDER -> SELL_ORDER`, `BUY_ORDER -> INSTA_SELL`, `INSTA_BUY -> SELL_ORDER`, and `INSTA_BUY -> INSTA_SELL`.
 - Price direction: `buyPrice` for Buy Order/Insta Sell; `sellPrice` for Insta Buy/Sell Order.
 - Profit: profit, ROI, Bazaar tax, gross and after-tax revenue, and produced quantities.

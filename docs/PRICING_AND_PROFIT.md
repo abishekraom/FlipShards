@@ -6,7 +6,7 @@ Hypixel names Bazaar values from the order side, while FlipShards names them fro
 
 ## Official Snapshot Fields
 
-The client requests one snapshot per manual load:
+The client requests one snapshot after the fusion catalog loads and one per manual reload:
 
 ```text
 https://api.hypixel.net/v2/skyblock/bazaar
@@ -22,10 +22,10 @@ The adapter reads only `success`, top-level `lastUpdated`, each expected product
 | `instaBuyPrice` | `quick_status.sellPrice` | Cost when instantly buying inputs from sell offers |
 | `sellOrderPrice` | `quick_status.sellPrice` | Gross revenue when listing output as a sell offer |
 | `instaSellPrice` | `quick_status.buyPrice` | Gross revenue when instantly selling output into buy orders |
-| `buyVolume` | `quick_status.sellVolume` | Current input-side availability for instant buying |
-| `sellVolume` | `quick_status.buyVolume` | Current output-side availability for instant selling |
-| `buyActivity7d` | `quick_status.sellMovingWeek` | Official seven-day sell-offer-side activity signal |
-| `sellActivity7d` | `quick_status.buyMovingWeek` | Official seven-day buy-order-side activity signal |
+| `buyVolume` | `quick_status.sellVolume` | Internal buy-side available volume |
+| `sellVolume` | `quick_status.buyVolume` | Internal sell-side available volume |
+| `buyActivity7d` | `quick_status.sellMovingWeek` | Official seven-day value used as buy-side activity |
+| `sellActivity7d` | `quick_status.buyMovingWeek` | Official seven-day value used as sell-side activity |
 
 A valid top-level `lastUpdated` timestamp is used for every mapped record. Missing or malformed products are omitted and shown in coverage; they are never converted to zero or backfilled from an older snapshot.
 

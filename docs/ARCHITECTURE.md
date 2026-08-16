@@ -43,6 +43,6 @@ After costs stabilize, the acquisition tree is built by following the selected d
 
 ## Snapshot Boundary
 
-The app performs one browser-side GET to the official Hypixel Bazaar endpoint for each manual load. It uses normal browser cache behavior, `credentials: omit`, an AbortController timeout, and no automatic retry. Raw responses are parsed locally and are not retained in React state, storage, or logs.
+The app performs one browser-side GET to the official Hypixel Bazaar endpoint after the fusion catalog loads and for each manual reload. It uses normal browser cache behavior, `credentials: omit`, an AbortController timeout, and no automatic retry. Raw responses are parsed locally and are not retained in React state, storage, or logs.
 
 A valid partial response replaces the active map atomically with its validated records. A transport, HTTP, timeout, JSON, schema, or zero-usable failure retains the previous in-memory map as stale. A first-load failure remains unavailable. There is no persistent history, scheduled refresh, server proxy, API key, or runtime CoflNet fallback.
