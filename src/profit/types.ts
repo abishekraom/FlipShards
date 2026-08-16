@@ -43,16 +43,16 @@ export interface RecipeBook {
 export interface ShardPrice {
   shardId: ShardId;
   itemTag: string;
-  buyOrderPrice: number | null;
-  instaBuyPrice: number | null;
-  sellOrderPrice: number | null;
-  instaSellPrice: number | null;
+  buyOrderPrice: number;
+  instaBuyPrice: number;
+  sellOrderPrice: number;
+  instaSellPrice: number;
   buyVolume: number;
   sellVolume: number;
-  averageInstaBuys: number;
-  averageInstaSells: number;
+  buyActivity7d: number;
+  sellActivity7d: number;
   lastUpdated: string;
-  source: "coflnet";
+  source: "hypixel-bazaar";
 }
 
 export interface AcquisitionNode {
@@ -90,8 +90,8 @@ export interface ProfitResult {
   roi: number;
   buyVolume: number;
   sellVolume: number;
-  averageInstaBuys: number;
-  averageInstaSells: number;
+  buyActivity7d: number;
+  sellActivity7d: number;
   liquidityScore: number;
   risk: RiskLevel;
   acquisitionTree: AcquisitionNode;

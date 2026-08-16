@@ -2,45 +2,39 @@
 
 This file is the source of truth for Bazaar price interpretation.
 
-Hypixel and CoflNet naming is confusing because `buyPrice` and `sellPrice` are named from the player action shown in Bazaar, not from our internal profit workflow.
+Hypixel names Bazaar values from the order side, while FlipShards names them from the player's action. The adapter preserves the existing optimizer concepts without parsing order summaries.
 
-## CoflNet Snapshot Fields
+## Official Snapshot Fields
 
-CoflNet endpoint:
+The client requests one snapshot per manual load:
 
 ```text
-https://sky.coflnet.com/api/bazaar/{ITEM_TAG}/snapshot
+https://api.hypixel.net/v2/skyblock/bazaar
 ```
 
-Important fields:
-
-- `buyPrice`: the price to buy instantly from existing sell offers
-- `buyVolume`: available volume on the instant-buy / sell-offer side
-- `sellPrice`: the price received when selling instantly into existing buy orders
-- `sellVolume`: available volume on the instant-sell / buy-order side
+The adapter reads only `success`, top-level `lastUpdated`, each expected product identity, and `quick_status`. `sell_summary` and `buy_summary` are intentionally not retained.
 
 ## App Price Mapping
 
-The app normalizes CoflNet fields into clearer names:
-
-| App field | CoflNet field | Meaning |
+| App field | Hypixel field | Meaning |
 | --- | --- | --- |
-| `buyOrderPrice` | `sellPrice` | Cost basis when acquiring inputs through buy orders |
-| `instaBuyPrice` | `buyPrice` | Cost when instantly buying inputs from sell offers |
-| `sellOrderPrice` | `buyPrice` | Gross revenue when listing output as a sell offer |
-| `instaSellPrice` | `sellPrice` | Gross revenue when instantly selling output into buy orders |
+| `buyOrderPrice` | `quick_status.buyPrice` | Cost basis when acquiring inputs through buy orders |
+| `instaBuyPrice` | `quick_status.sellPrice` | Cost when instantly buying inputs from sell offers |
+| `sellOrderPrice` | `quick_status.sellPrice` | Gross revenue when listing output as a sell offer |
+| `instaSellPrice` | `quick_status.buyPrice` | Gross revenue when instantly selling output into buy orders |
+| `buyVolume` | `quick_status.sellVolume` | Current input-side availability for instant buying |
+| `sellVolume` | `quick_status.buyVolume` | Current output-side availability for instant selling |
+| `buyActivity7d` | `quick_status.sellMovingWeek` | Official seven-day sell-offer-side activity signal |
+| `sellActivity7d` | `quick_status.buyMovingWeek` | Official seven-day buy-order-side activity signal |
+
+A valid top-level `lastUpdated` timestamp is used for every mapped record. Missing or malformed products are omitted and shown in coverage; they are never converted to zero or backfilled from an older snapshot.
 
 Example:
 
 ```text
-Buy instantly: 177,457
-Sell instantly: 91,950
+Hypixel sellPrice: 177,457
+Hypixel buyPrice: 91,950
 ```
-
-This means:
-
-- `177,457` is the sell-offer side, used for instant-buy input cost and sell-order output revenue
-- `91,950` is the buy-order side, used for buy-order input cost and instant-sell output revenue
 
 Therefore, directly doing `INSTA_BUY -> INSTA_SELL` on the same shard should lose money before tax:
 
@@ -105,9 +99,9 @@ score = max(0, profit) * log(volume + 1) * liquidityFactor
 
 ## Risk Labels
 
-Risk labels are based on CoflNet's average insta-buys per week, because this is closest to the in-game signal used to judge whether a shard can realistically move.
+Risk labels use `buyActivity7d` and the retained thresholds below as a provisional compatibility heuristic over official seven-day activity. They are not a CoflNet average, forecast, or guarantee.
 
-| Risk | Average insta-buys per week |
+| Risk | Official seven-day buy activity |
 | --- | --- |
 | `HIGH` | below 9,000 |
 | `MEDIUM HIGH` | 9,000 to 9,999 |
@@ -115,7 +109,7 @@ Risk labels are based on CoflNet's average insta-buys per week, because this is 
 | `MEDIUM LOW` | 20,000 to 21,999 |
 | `LOW` | 22,000 or more |
 
-These labels are not guarantees. They are a quick way to avoid treating thin markets as safe.
+These labels are not guarantees. They are a quick way to avoid treating thin markets as safe while a future demand model remains out of scope.
 
 ## Known Accuracy Gaps
 
@@ -124,7 +118,7 @@ Current gaps:
 - no outbid increment for buy orders
 - no undercut increment for sell offers
 - no partial-fill modeling
-- no stale-price age warning yet
+- freshness is shown at load time, but there is no automatic refresh
 - no explicit slippage model
 
 Good future improvements:
