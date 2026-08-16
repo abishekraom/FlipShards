@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { AlertTriangle, ArrowDownUp, BarChart3, Calculator, Check, ChevronDown, LockKeyhole, RefreshCw, ShieldCheck, TreePine } from "lucide-react";
 import { fetchCoflNetShardPrices } from "./coflnet";
 import { formatCoins, formatPercent, formatQuantity } from "./format";
@@ -194,7 +194,9 @@ const buildCraftTree = (
   });
 
   if (template.method === "BUY" || !template.recipe || !template.children?.length) {
-    return directNode();
+    const result = directNode();
+    console.log(`buildCraftTree: ${template.shardId} qty=${requiredQuantity} method=${template.method} totalCost=${result.totalCost}`);
+    return result;
   }
 
   const craftsNeeded = Math.ceil(requiredQuantity / template.recipe.resultQuantity);
@@ -215,13 +217,13 @@ const buildCraftTree = (
       };
     }
   } else if (directUnitCost !== null && directUnitCost * requiredQuantity <= fusionTotalCost) {
-    return {
+    return {  
       ...directNode(),
       reason: "direct buy is the lowest executable input cost",
     };
   }
 
-  return {
+  const result: CraftNode = {
     shardId: template.shardId,
     quantity: requiredQuantity,
     producedQuantity,
@@ -232,6 +234,8 @@ const buildCraftTree = (
     craftsNeeded,
     children,
   };
+  console.log(`buildCraftTree: ${template.shardId} qty=${requiredQuantity} method=FUSE totalCost=${result.totalCost}`);
+  return result;
 };
 
 const CraftTree = ({ node, book, depth = 0 }: { node: CraftNode; book: RecipeBook; depth?: number }) => {
@@ -291,35 +295,100 @@ const CraftCalculations = ({
   const revenueAfterTax = result.revenueAfterTax * sellableQuantity;
   const profit = revenueAfterTax - craftTree.totalCost;
   const roi = craftTree.totalCost > 0 ? (profit / craftTree.totalCost) * 100 : 0;
+  // For display: show base recipe ingredients scaled by quantity
+  const recipeInputs = (result.acquisitionTree.children ?? []).map(child => ({
+    ...child,
+    quantity: child.quantity * quantity,
+  })).slice(0, 2);
+  const directBuyCost = result.totalCost / Math.max(result.producedQuantity, 1);
+  const fusionSavings = directBuyCost > 0 ? Math.max(0, (1 - craftTree.totalCost / Math.max((directBuyCost * sellableQuantity), 1)) * 100) : 0;
 
   return (
     <div className="surface-panel p-5">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <div
+        className="mb-5 rounded-[16px] border border-stone-800/80 px-4 py-5 shadow-[0_18px_50px_rgba(2,6,23,0.42)]"
+        style={{
+          background:
+            "radial-gradient(circle at 18% 0%, rgba(215, 180, 106, 0.12), transparent 28rem), linear-gradient(135deg, #0a0a09 0%, #12100e 42%, #090908 100%)",
+        }}
+      >
+        <div className="text-center text-[0.68rem] font-semibold uppercase tracking-[0.32em] text-amber-300/90">Recipe Tree</div>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-center sm:gap-4">
+          {recipeInputs.length > 0 && (
+            <>
+              {recipeInputs.map((input, index) => (
+                <Fragment key={`${input.shardId}-${index}`}>
+                  {index > 0 && <span className="text-3xl font-light text-stone-500">+</span>}
+                  <div className="flex min-w-[120px] flex-col items-center gap-1">
+                    <span className="numeric text-[0.7rem] text-stone-400">{formatQuantity(input.quantity)}x</span>
+                    <span className="text-[clamp(1.9rem,3vw,3.8rem)] font-black leading-none tracking-[-0.06em] text-stone-50">{book.shards[input.shardId]?.name ?? input.shardId}</span>
+                    <span className="text-[0.58rem] uppercase tracking-[0.26em] text-stone-500">ingredient</span>
+                  </div>
+                </Fragment>
+              ))}
+              <span className="px-2 text-[clamp(2rem,4vw,3.5rem)] leading-none text-stone-500" style={{ transform: "translateY(-2px)" }}>→</span>
+            </>
+          )}
+          <div className="flex min-w-[120px] flex-col items-center gap-1">
+            <span className="numeric text-[0.7rem] text-stone-400">{formatQuantity(quantity)}x</span>
+            <span className="text-[clamp(1.9rem,3vw,3.8rem)] font-black leading-none tracking-[-0.06em] text-stone-50">{shard?.name ?? result.shardId}</span>
+            <span className="text-[0.58rem] uppercase tracking-[0.26em] text-stone-500">result</span>
+          </div>
+        </div>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-lg text-stone-200 sm:text-2xl">
+          <span className="numeric font-semibold text-amber-300">Cost {formatCoins(craftTree.totalCost)}</span>
+          <span className="text-emerald-300">{formatPercent(fusionSavings)} cheaper than buying 1x outright</span>
+        </div>
+      </div>
+      <div className="mx-auto max-w-5xl">
         <div className="space-y-4">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-stone-200">
+          <div className="text-center sm:text-left">
+            <div className="mb-2 flex items-center justify-center gap-2 text-sm font-semibold text-stone-200 sm:justify-start">
               <Calculator className="h-4 w-4 text-amber-200" />
               Craft Calculations
             </div>
-            <h2 className="text-2xl font-semibold text-stone-50">{shard?.name ?? result.shardId}</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-400">
+            <h2 className="text-2xl font-semibold text-stone-50 sm:text-5xl">{shard?.name ?? result.shardId}</h2>
+            <p className="mx-auto mt-2 max-w-3xl text-sm leading-6 text-stone-400 sm:mx-0">
               Plan an exact output goal. If a fusion recipe produces extra shards, the totals assume you sell the full produced amount.
             </p>
           </div>
 
-          <label className="flex flex-col gap-2 text-xs font-medium uppercase tracking-wide text-stone-400">
-            Desired output shards
-            <input
-              className="numeric rounded-md border border-stone-700/80 bg-stone-950/70 px-3 py-2 text-base font-semibold text-stone-100"
-              type="number"
-              min="1"
-              step="1"
-              value={quantity}
-              onChange={(event) => onQuantityChange(Math.max(1, Math.floor(Number(event.target.value) || 1)))}
-            />
-          </label>
+          <div className="mx-auto max-w-xl">
+            <label className="flex flex-col gap-2 text-xs font-medium uppercase tracking-wide text-stone-400">
+              Desired output shards
+              <div className="flex items-center gap-2">
+                <input
+                  className="numeric w-full rounded-md border border-stone-700/80 bg-stone-950/70 px-3 py-2 text-base font-semibold text-stone-100"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={quantity}
+                  onWheel={(event) => event.preventDefault()}
+                  onChange={(event) => onQuantityChange(Math.max(1, Math.floor(Number(event.target.value) || 1)))}
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-stone-700 bg-stone-950/80 text-xl font-semibold text-stone-200 transition hover:border-cyan-400/60 hover:text-cyan-100"
+                    onClick={() => onQuantityChange(quantity + 1)}
+                    aria-label="Increase output shards"
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-stone-700 bg-stone-950/80 text-xl font-semibold text-stone-200 transition hover:border-cyan-400/60 hover:text-cyan-100"
+                    onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
+                    aria-label="Decrease output shards"
+                  >
+                    −
+                  </button>
+                </div>
+              </div>
+            </label>
+          </div>
 
-          <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
             <Metric label="Requested" value={`${formatQuantity(quantity)}x`} />
             <Metric label="Produced" value={`${formatQuantity(sellableQuantity)}x`} />
             <Metric label="Total Cost" value={formatCoins(craftTree.totalCost)} />
@@ -340,14 +409,6 @@ const CraftCalculations = ({
               </div>
             </div>
           </div>
-        </div>
-
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-stone-200">
-            <TreePine className="h-4 w-4 text-cyan-200" />
-            Required shard tree
-          </div>
-          <CraftTree node={craftTree} book={book} />
         </div>
       </div>
     </div>
@@ -379,11 +440,17 @@ const TokenGate = ({
         <LockKeyhole className="h-3.5 w-3.5" />
         CoflNet access required
       </div>
-      <h2 className="text-2xl font-semibold text-stone-50">Enter your CoflNet API token</h2>
+      <h2 className="text-2xl font-semibold text-stone-50">Welcome to Flipshards</h2>
       <p className="mt-2 text-sm leading-6 text-stone-400">
-        The calculator only uses live CoflNet data in production mode. Your token is kept in page memory only, cleared from the input after submit,
+        This calculator only uses live CoflNet data in production mode. Your token is kept in page memory only, cleared from the input after submit,
         and disappears when you refresh or close this page.
       </p>
+      <div className="mt-2 text-sm leading-6 text-stone-400">
+        <div>To get your token:</div>
+        <div>1- Download and sign in to <a className="text-cyan-300 underline decoration-cyan-400/60 underline-offset-2 transition hover:text-cyan-200" href="https://sky.coflnet.com/" rel="noreferrer" target="_blank">SkyCofl</a></div>
+        <div>2- Type in chat /cofl api</div>
+        <div>3- Copy that API key and paste it</div>
+      </div>
 
       <label className="mt-5 flex flex-col gap-2 text-xs font-medium uppercase tracking-wide text-stone-400">
         CoflNet API token
@@ -393,7 +460,7 @@ const TokenGate = ({
           disabled={disabled}
           name="coflnet-token"
           onChange={(event) => onTokenChange(event.target.value)}
-          placeholder="Paste your Bearer token"
+          placeholder="Paste your API key token here"
           spellCheck={false}
           type="password"
           value={token}
@@ -497,11 +564,13 @@ const ProfitTable = ({
   selected,
   book,
   onSelect,
+  onDoubleClick,
 }: {
   results: ProfitResult[];
   selected: ProfitResult | null;
   book: RecipeBook;
   onSelect: (result: ProfitResult) => void;
+  onDoubleClick?: (result: ProfitResult) => void;
 }) => (
   <div className="market-table overflow-hidden">
     <div className="max-h-[620px] overflow-auto">
@@ -527,6 +596,7 @@ const ProfitTable = ({
                 key={`${result.shardId}-${result.buyMode}-${result.sellMode}`}
                 className={`cursor-pointer transition ${isSelected ? "bg-cyan-500/10 shadow-[inset_3px_0_0_rgba(139,223,242,0.72)]" : "hover:bg-stone-900/70"}`}
                 onClick={() => onSelect(result)}
+                onDoubleClick={() => onDoubleClick?.(result)}
               >
                 <td className="px-3 py-3">
                   <div className="font-medium text-stone-100">{getShardName(book, result.shardId)}</div>
@@ -1000,7 +1070,18 @@ export const ProfitApp = () => {
                     Ranked opportunities
                     <span className="text-xs font-normal text-stone-500">{sourceLabel}</span>
                   </div>
-                  <ProfitTable results={rankedResults} selected={selected} book={recipeBook} onSelect={setSelected} />
+                  <ProfitTable 
+                    results={rankedResults} 
+                    selected={selected} 
+                    book={recipeBook} 
+                    onSelect={setSelected}
+                    onDoubleClick={(result) => {
+                      setSelected(result);
+                      setCraftTargetId(result.shardId);
+                      setCraftQuantity(1);
+                      setActiveTab("craft");
+                    }}
+                  />
                 </div>
 
                 <section>
