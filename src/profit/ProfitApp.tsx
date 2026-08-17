@@ -356,6 +356,7 @@ const CraftCalculations = ({
             <TreePine className="h-4 w-4 text-cyan-200" />
             Required shard tree
           </div>
+          <MarketStats result={result} />
           <CraftTree node={craftTree} book={book} />
         </div>
       </div>
@@ -398,6 +399,19 @@ const AcquisitionTree = ({ node, book, depth = 0 }: { node: AcquisitionNode; boo
   );
 };
 
+const MarketStats = ({
+  result,
+}: {
+  result: Pick<ProfitResult, "buyVolume" | "sellVolume" | "buyActivity7d" | "sellActivity7d">;
+}) => (
+  <div className="grid grid-cols-2 gap-2 text-sm">
+    <Metric label="Buy Volume" value={formatCoins(result.buyVolume)} />
+    <Metric label="Sell Volume" value={formatCoins(result.sellVolume)} />
+    <Metric label="7d Buy Activity" value={formatCoins(result.buyActivity7d)} />
+    <Metric label="7d Sell Activity" value={formatCoins(result.sellActivity7d)} />
+  </div>
+);
+
 const ProfitTable = ({
   results,
   selected,
@@ -411,7 +425,7 @@ const ProfitTable = ({
 }) => (
   <div className="market-table overflow-hidden">
     <div className="max-h-[620px] overflow-auto">
-      <table className="w-full min-w-[960px] text-left text-sm">
+      <table className="w-full min-w-[1180px] text-left text-sm">
         <thead className="sticky top-0 z-10 bg-stone-950/95 text-xs uppercase tracking-wide text-stone-400 backdrop-blur">
           <tr>
             <th className="px-3 py-3">Shard</th>
@@ -419,15 +433,16 @@ const ProfitTable = ({
             <th className="px-3 py-3 text-right">ROI</th>
             <th className="px-3 py-3 text-right">Cost</th>
             <th className="px-3 py-3 text-right">After Tax</th>
-            <th className="px-3 py-3 text-right">Volume</th>
+            <th className="px-3 py-3 text-right">Buy Volume</th>
+            <th className="px-3 py-3 text-right">Sell Volume</th>
             <th className="px-3 py-3 text-right">7d Buy Activity</th>
+            <th className="px-3 py-3 text-right">7d Sell Activity</th>
             <th className="px-3 py-3">Risk</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-stone-800">
           {results.map((result) => {
             const isSelected = selected?.shardId === result.shardId;
-            const volume = Math.min(result.buyVolume, result.sellVolume);
             return (
               <tr
                 key={`${result.shardId}-${result.buyMode}-${result.sellMode}`}
@@ -444,8 +459,10 @@ const ProfitTable = ({
                 <td className="numeric px-3 py-3 text-right text-stone-200">{formatPercent(result.roi)}</td>
                 <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.totalCost)}</td>
                 <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.revenueAfterTax * result.producedQuantity)}</td>
-                <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(volume)}</td>
+                <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.buyVolume)}</td>
+                <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.sellVolume)}</td>
                 <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.buyActivity7d)}</td>
+                <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.sellActivity7d)}</td>
                 <td className="px-3 py-3">
                   <span className={`inline-flex rounded border px-2 py-1 text-xs font-medium ${riskStyles[result.risk]}`}>
                     {riskLabels[result.risk]}
@@ -819,6 +836,7 @@ export const ProfitApp = () => {
                             <Metric label="After Tax" value={formatCoins(selected.revenueAfterTax * selected.producedQuantity)} />
                             <Metric label="Produced" value={`${formatQuantity(selected.producedQuantity)}x`} />
                           </div>
+                          <MarketStats result={selected} />
                         </div>
                         <div className="tree-node flex items-center gap-2 px-3 py-2 text-xs text-stone-400">
                           <ArrowDownUp className="h-4 w-4 text-stone-300" />
