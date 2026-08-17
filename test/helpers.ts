@@ -54,8 +54,8 @@ export const createPayload = (recipeBook: RecipeBook, omitTags: string[] = []): 
       product_id: shard.internal_id,
       quick_status: {
         productId: shard.internal_id,
-        buyPrice: 80,
-        sellPrice: 100,
+        buyPrice: 100,
+        sellPrice: 80,
         buyVolume: 22,
         sellVolume: 11,
         buyMovingWeek: 44,

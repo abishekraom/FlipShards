@@ -18,10 +18,10 @@ The adapter reads only `success`, top-level `lastUpdated`, each expected product
 
 | App field | Hypixel field | Meaning |
 | --- | --- | --- |
-| `buyOrderPrice` | `quick_status.buyPrice` | Cost basis when acquiring inputs through buy orders |
-| `instaBuyPrice` | `quick_status.sellPrice` | Cost when instantly buying inputs from sell offers |
-| `sellOrderPrice` | `quick_status.sellPrice` | Gross revenue when listing output as a sell offer |
-| `instaSellPrice` | `quick_status.buyPrice` | Gross revenue when instantly selling output into buy orders |
+| `buyOrderPrice` | `quick_status.sellPrice` | Cost basis when acquiring inputs through buy orders |
+| `instaBuyPrice` | `quick_status.buyPrice` | Cost when instantly buying inputs from sell offers |
+| `sellOrderPrice` | `quick_status.buyPrice` | Gross revenue when listing output as a sell offer |
+| `instaSellPrice` | `quick_status.sellPrice` | Gross revenue when instantly selling output into buy orders |
 | `buyVolume` | `quick_status.sellVolume` | Internal buy-side available volume |
 | `sellVolume` | `quick_status.buyVolume` | Internal sell-side available volume |
 | `buyActivity7d` | `quick_status.sellMovingWeek` | Official seven-day value used as buy-side activity |
@@ -32,8 +32,8 @@ A valid top-level `lastUpdated` timestamp is used for every mapped record. Missi
 Example:
 
 ```text
-Hypixel sellPrice: 177,457
-Hypixel buyPrice: 91,950
+Hypixel sellPrice: 91,950
+Hypixel buyPrice: 177,457
 ```
 
 Therefore, directly doing `INSTA_BUY -> INSTA_SELL` on the same shard should lose money before tax:

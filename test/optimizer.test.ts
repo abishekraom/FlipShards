@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { buildHypixelSnapshot } from "../src/profit/hypixel";
 import { ProfitOptimizer } from "../src/profit/optimizer";
 import type { ProfitSettings, RecipeBook, Shard, ShardPrice } from "../src/profit/types";
-import { createPrice } from "./helpers";
+import { createPayload, createPrice, createRecipeBook, RAINBUG_TAG } from "./helpers";
 
 const makeShard = (id: string, internalId = `SHARD_${id}`): Shard => ({
   id,
@@ -61,6 +62,23 @@ test("preserves fixed-price optimizer parity for all four mode pairs", () => {
     assert.equal(result.buyActivity7d, 33);
     assert.equal(result.sellActivity7d, 44);
   }
+});
+
+test("preserves raw action-side semantics through the optimizer", () => {
+  const book = createRecipeBook(2);
+  const report = buildHypixelSnapshot(book, createPayload(book, [RAINBUG_TAG]));
+  const optimizer = new ProfitOptimizer(book, report.prices);
+  const [buyOrderToSellOrder] = optimizer.calculateAllProfits(settings("BUY_ORDER", "SELL_ORDER"));
+  const [instantBuyToInstantSell] = optimizer.calculateAllProfits(settings("INSTA_BUY", "INSTA_SELL"));
+
+  assert.ok(buyOrderToSellOrder);
+  assert.equal(buyOrderToSellOrder.totalCost, 80);
+  assert.equal(buyOrderToSellOrder.grossRevenue, 100);
+  assert.equal(buyOrderToSellOrder.profit, 10);
+  assert.ok(instantBuyToInstantSell);
+  assert.equal(instantBuyToInstantSell.totalCost, 100);
+  assert.equal(instantBuyToInstantSell.grossRevenue, 80);
+  assert.ok(instantBuyToInstantSell.profit < 0);
 });
 
 test("keeps liquidity direction and provisional activity risk thresholds", () => {

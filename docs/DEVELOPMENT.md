@@ -76,8 +76,8 @@ If the table is empty:
 If prices look reversed:
 
 - read [Pricing And Profit](PRICING_AND_PROFIT.md)
-- verify `buyPrice` maps to Buy Order and Insta Sell
-- verify `sellPrice` maps to Insta Buy and Sell Order
+- verify `sellPrice` maps to Buy Order and Insta Sell
+- verify `buyPrice` maps to Insta Buy and Sell Order
 
 ## Local-versus-Deployed Parity Checklist
 
@@ -86,7 +86,7 @@ Run a production-equivalent local preview and compare it with the deployed app u
 - Static graph: same 321 SkyShards catalog, names, recipes, fusion and craft trees.
 - Workflow: no token gate, one official request on initial load, then manual reload only.
 - Modes: `BUY_ORDER -> SELL_ORDER`, `BUY_ORDER -> INSTA_SELL`, `INSTA_BUY -> SELL_ORDER`, and `INSTA_BUY -> INSTA_SELL`.
-- Price direction: `buyPrice` for Buy Order/Insta Sell; `sellPrice` for Insta Buy/Sell Order.
+- Price direction: `sellPrice` for Buy Order/Insta Sell; `buyPrice` for Insta Buy/Sell Order.
 - Profit: profit, ROI, Bazaar tax, gross and after-tax revenue, and produced quantities.
 - Volume/liquidity: `sellVolume -> buyVolume`, `buyVolume -> sellVolume`, minimum-volume filter, and liquidity ranking.
 - Risk/activity: visible official seven-day labels and clearly provisional heuristic wording.
