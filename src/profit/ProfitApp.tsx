@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
-import { AlertTriangle, ArrowDownUp, BarChart3, Calculator, Check, ChevronDown, LockKeyhole, RefreshCw, ShieldCheck, TreePine } from "lucide-react";
-import { fetchCoflNetShardPrices } from "./coflnet";
+import { AlertTriangle, ArrowDownUp, BarChart3, Calculator, Check, ChevronDown, RefreshCw, ShieldCheck, TreePine } from "lucide-react";
+import { fetchHypixelShardPrices, HypixelSnapshotError } from "./hypixel";
+import { applySnapshotFailure, applySnapshotReport, initialSnapshotState, runCurrentSnapshotRequest } from "./snapshot-state";
 import { formatCoins, formatPercent, formatQuantity } from "./format";
 import { ProfitOptimizer, rankProfits } from "./optimizer";
 import { normalizeFusionData } from "./recipes";
@@ -45,8 +46,6 @@ const riskLabels = {
 
 const rarityOrder = ["legendary", "rare", "epic", "uncommon", "common"];
 const typeOrder = ["Global", "Taming", "Farming", "Hunting", "Mining", "Combat", "Foraging", "Fishing", "Enchanting"];
-const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-
 const sortWithPreferredOrder = (values: string[], preferred: string[]) =>
   [...values].sort((left, right) => {
     const leftIndex = preferred.indexOf(left);
@@ -154,9 +153,19 @@ const loadFusionData = async () => {
 
 const getShardName = (book: RecipeBook, shardId: string) => book.shards[shardId]?.name ?? shardId;
 
-type AppTab = "opportunities" | "craft";
-type PriceStatus = "awaiting-token" | "loading" | "ready" | "error";
+const formatSnapshotAge = (lastUpdatedMs: number) => {
+  const ageMs = Date.now() - lastUpdatedMs;
+  if (ageMs < 0) return "timestamp ahead of local clock";
+  const ageMinutes = Math.floor(ageMs / 60_000);
+  if (ageMinutes < 1) return "less than 1m old";
+  if (ageMinutes < 60) return `${ageMinutes}m old`;
+  return `${Math.floor(ageMinutes / 60)}h old`;
+};
 
+const formatSnapshotLabel = (report: { coverage: { loaded: number; expected: number; matched: number; missing: number; malformed: number }; lastUpdated: string; lastUpdatedMs: number }) =>
+  `Hypixel Bazaar snapshot | ${report.coverage.loaded}/${report.coverage.expected} loaded | ${report.coverage.matched} matched | ${report.coverage.missing} missing | ${report.coverage.malformed} malformed | updated ${report.lastUpdated} (${formatSnapshotAge(report.lastUpdatedMs)})`;
+
+type AppTab = "opportunities" | "craft";
 interface CraftNode {
   shardId: string;
   quantity: number;
@@ -347,115 +356,13 @@ const CraftCalculations = ({
             <TreePine className="h-4 w-4 text-cyan-200" />
             Required shard tree
           </div>
+          <MarketStats result={result} />
           <CraftTree node={craftTree} book={book} />
         </div>
       </div>
     </div>
   );
 };
-
-const TokenGate = ({
-  token,
-  disabled,
-  error,
-  onTokenChange,
-  onSubmit,
-}: {
-  token: string;
-  disabled: boolean;
-  error: string;
-  onTokenChange: (token: string) => void;
-  onSubmit: () => void;
-}) => (
-  <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-stone-950/85 px-4 backdrop-blur-sm">
-    <form
-      className="modal-panel w-full max-w-lg rounded-md border border-cyan-400/30 bg-[#151412]/95 p-6 shadow-2xl shadow-cyan-950/30"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit();
-      }}
-    >
-      <div className="mb-4 inline-flex items-center gap-2 rounded border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-xs font-semibold text-cyan-100">
-        <LockKeyhole className="h-3.5 w-3.5" />
-        CoflNet access required
-      </div>
-      <h2 className="text-2xl font-semibold text-stone-50">Enter your CoflNet API token</h2>
-      <p className="mt-2 text-sm leading-6 text-stone-400">
-        The calculator only uses live CoflNet data in production mode. Your token is kept in page memory only, cleared from the input after submit,
-        and disappears when you refresh or close this page.
-      </p>
-
-      <label className="mt-5 flex flex-col gap-2 text-xs font-medium uppercase tracking-wide text-stone-400">
-        CoflNet API token
-        <input
-          autoComplete="off"
-          className="rounded border border-stone-700 bg-stone-900 px-3 py-2 text-sm text-stone-100 outline-none transition focus:border-cyan-400/70"
-          disabled={disabled}
-          name="coflnet-token"
-          onChange={(event) => onTokenChange(event.target.value)}
-          placeholder="Paste your Bearer token"
-          spellCheck={false}
-          type="password"
-          value={token}
-        />
-      </label>
-
-      {error && (
-        <div className="mt-4 flex items-start gap-2 rounded border border-red-400/30 bg-red-400/10 px-3 py-2 text-sm text-red-100">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      <button
-        className="premium-button mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-cyan-400/30 bg-cyan-400/15 px-4 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-400/25 disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={disabled || token.trim().length === 0}
-        type="submit"
-      >
-        <RefreshCw className={`h-4 w-4 ${disabled ? "animate-spin" : ""}`} />
-        Load CoflNet Data
-      </button>
-    </form>
-  </div>
-);
-
-const AutoRefreshWarning = ({
-  onCancel,
-  onProceed,
-}: {
-  onCancel: () => void;
-  onProceed: () => void;
-}) => (
-  <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 px-4 backdrop-blur-sm">
-    <div className="modal-panel w-full max-w-md rounded-md border border-amber-400/40 bg-[#181612]/95 p-5 shadow-2xl shadow-amber-950/30">
-      <div className="mb-3 inline-flex items-center gap-2 rounded border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-xs font-semibold text-amber-100">
-        <AlertTriangle className="h-4 w-4" />
-        Auto-refresh warning
-      </div>
-      <h2 className="text-xl font-semibold text-stone-50">Only enable this with Cofl premium</h2>
-      <p className="mt-2 text-sm leading-6 text-stone-300">
-        Automatic loading refreshes every 5 minutes and can send many CoflNet snapshot requests. Only use this option if your token is Cofl
-        premium. If it is not premium, leave this off or your token might be rate limited or blocked.
-      </p>
-      <div className="mt-5 grid gap-2 sm:grid-cols-2">
-        <button
-          className="premium-button inline-flex h-10 items-center justify-center rounded-md border border-stone-600 bg-stone-900 px-4 text-sm font-semibold text-stone-100 transition hover:bg-stone-800"
-          onClick={onCancel}
-          type="button"
-        >
-          Leave Off
-        </button>
-        <button
-          className="premium-button inline-flex h-10 items-center justify-center rounded-md border border-amber-400/40 bg-amber-400/15 px-4 text-sm font-semibold text-amber-50 transition hover:bg-amber-400/25"
-          onClick={onProceed}
-          type="button"
-        >
-          Proceed and Turn On
-        </button>
-      </div>
-    </div>
-  </div>
-);
 
 const AcquisitionTree = ({ node, book, depth = 0 }: { node: AcquisitionNode; book: RecipeBook; depth?: number }) => {
   const shard = book.shards[node.shardId];
@@ -492,6 +399,42 @@ const AcquisitionTree = ({ node, book, depth = 0 }: { node: AcquisitionNode; boo
   );
 };
 
+const MarketStats = ({
+  result,
+}: {
+  result: Pick<ProfitResult, "buyVolume" | "sellVolume" | "buyActivity7d" | "sellActivity7d">;
+}) => (
+  <div className="grid grid-cols-2 gap-2 text-sm">
+    <Metric label="Buy Volume" value={formatCoins(result.buyVolume)} />
+    <Metric label="Sell Volume" value={formatCoins(result.sellVolume)} />
+    <Metric label="7d Buy Activity" value={formatCoins(result.buyActivity7d)} />
+    <Metric label="7d Sell Activity" value={formatCoins(result.sellActivity7d)} />
+  </div>
+);
+
+const DirectionalStatsCell = ({
+  buyLabel,
+  sellLabel,
+  buyValue,
+  sellValue,
+}: {
+  buyLabel: string;
+  sellLabel: string;
+  buyValue: number;
+  sellValue: number;
+}) => (
+  <div className="grid grid-cols-2 gap-2 text-right">
+    <div>
+      <div className="text-[10px] font-medium uppercase tracking-wide text-stone-500">{buyLabel}</div>
+      <div className="numeric text-stone-300">{formatCoins(buyValue)}</div>
+    </div>
+    <div>
+      <div className="text-[10px] font-medium uppercase tracking-wide text-stone-500">{sellLabel}</div>
+      <div className="numeric text-stone-300">{formatCoins(sellValue)}</div>
+    </div>
+  </div>
+);
+
 const ProfitTable = ({
   results,
   selected,
@@ -513,15 +456,14 @@ const ProfitTable = ({
             <th className="px-3 py-3 text-right">ROI</th>
             <th className="px-3 py-3 text-right">Cost</th>
             <th className="px-3 py-3 text-right">After Tax</th>
-            <th className="px-3 py-3 text-right">Volume</th>
-            <th className="px-3 py-3 text-right">Avg IB</th>
+            <th className="px-3 py-3 text-right">Volume <span className="normal-case text-[10px]">(Buy / Sell)</span></th>
+            <th className="px-3 py-3 text-right">7d Activity <span className="normal-case text-[10px]">(Buy / Sell)</span></th>
             <th className="px-3 py-3">Risk</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-stone-800">
           {results.map((result) => {
             const isSelected = selected?.shardId === result.shardId;
-            const volume = Math.min(result.buyVolume, result.sellVolume);
             return (
               <tr
                 key={`${result.shardId}-${result.buyMode}-${result.sellMode}`}
@@ -538,8 +480,22 @@ const ProfitTable = ({
                 <td className="numeric px-3 py-3 text-right text-stone-200">{formatPercent(result.roi)}</td>
                 <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.totalCost)}</td>
                 <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.revenueAfterTax * result.producedQuantity)}</td>
-                <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(volume)}</td>
-                <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.averageInstaBuys)}</td>
+                <td className="px-3 py-3">
+                  <DirectionalStatsCell
+                    buyLabel="Buy Volume"
+                    buyValue={result.buyVolume}
+                    sellLabel="Sell Volume"
+                    sellValue={result.sellVolume}
+                  />
+                </td>
+                <td className="px-3 py-3">
+                  <DirectionalStatsCell
+                    buyLabel="7d Buy Activity"
+                    buyValue={result.buyActivity7d}
+                    sellLabel="7d Sell Activity"
+                    sellValue={result.sellActivity7d}
+                  />
+                </td>
                 <td className="px-3 py-3">
                   <span className={`inline-flex rounded border px-2 py-1 text-xs font-medium ${riskStyles[result.risk]}`}>
                     {riskLabels[result.risk]}
@@ -557,23 +513,17 @@ const ProfitTable = ({
 
 export const ProfitApp = () => {
   const [recipeBook, setRecipeBook] = useState<RecipeBook | null>(null);
-  const [prices, setPrices] = useState<Record<string, ShardPrice>>({});
+  const [snapshotState, setSnapshotState] = useState(initialSnapshotState);
   const [settings, setSettings] = useState(defaultSettings);
   const [selected, setSelected] = useState<ProfitResult | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>("opportunities");
   const [craftTargetId, setCraftTargetId] = useState<string | null>(null);
   const [craftQuantity, setCraftQuantity] = useState(1);
-  const [apiToken, setApiToken] = useState("");
-  const [tokenDraft, setTokenDraft] = useState("");
-  const [tokenError, setTokenError] = useState("");
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
-  const [showAutoRefreshWarning, setShowAutoRefreshWarning] = useState(false);
-  const [isBackgroundRefreshing, setIsBackgroundRefreshing] = useState(false);
-  const [priceStatus, setPriceStatus] = useState<PriceStatus>("awaiting-token");
-  const [sourceLabel, setSourceLabel] = useState("Awaiting CoflNet token");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sourceLabel, setSourceLabel] = useState("Hypixel Bazaar snapshot unavailable");
   const [loadingMessage, setLoadingMessage] = useState("Loading fusion graph...");
   const loadSequenceRef = useRef(0);
-  const backgroundRefreshInFlightRef = useRef(false);
+  const requestControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -593,10 +543,10 @@ export const ProfitApp = () => {
   }, []);
 
   const allResults = useMemo(() => {
-    if (!recipeBook || priceStatus !== "ready") return [];
-    const optimizer = new ProfitOptimizer(recipeBook, prices);
+    if (!recipeBook || snapshotState.status === "unavailable") return [];
+    const optimizer = new ProfitOptimizer(recipeBook, snapshotState.prices);
     return optimizer.calculateAllProfits(settings);
-  }, [prices, priceStatus, recipeBook, settings]);
+  }, [recipeBook, settings, snapshotState.prices, snapshotState.status]);
 
   const rankedResults = useMemo(() => rankProfits(allResults, settings).slice(0, 250), [allResults, settings]);
 
@@ -649,143 +599,54 @@ export const ProfitApp = () => {
     }
   }, [craftTarget, craftTargetId]);
 
-  const loadLivePrices = useCallback(async (token: string, options: { background?: boolean } = {}) => {
+  const loadBazaarSnapshot = useCallback(async () => {
     if (!recipeBook) return;
-    const isBackground = options.background === true;
-    if (isBackground && backgroundRefreshInFlightRef.current) return;
-    if (isBackground) {
-      backgroundRefreshInFlightRef.current = true;
-      setIsBackgroundRefreshing(true);
-    }
 
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
     const loadSequence = loadSequenceRef.current + 1;
     loadSequenceRef.current = loadSequence;
-    setTokenError("");
+    setIsRefreshing(true);
+    setSourceLabel("Refreshing Hypixel Bazaar snapshot...");
+    setLoadingMessage("Loading Hypixel Bazaar snapshot...");
 
-    if (isBackground) {
-      setSourceLabel("Refreshing CoflNet in background...");
-    } else {
-      setPriceStatus("loading");
-      setPrices({});
-      setSelected(null);
-      setCraftTargetId(null);
-      setActiveTab("opportunities");
-      setLoadingMessage("Loading CoflNet prices: 0%");
-    }
-
-    try {
-      const report = await fetchCoflNetShardPrices(recipeBook, token, (done, total) => {
-        if (loadSequenceRef.current === loadSequence) {
-          const percent = Math.round((done / total) * 100);
-          if (isBackground) {
-            setSourceLabel(`Refreshing CoflNet: ${percent}%`);
-          } else {
-            setLoadingMessage(`Loading CoflNet prices: ${percent}%`);
-          }
-        }
-      });
-
-      if (loadSequenceRef.current !== loadSequence) return;
-
-      if (report.loaded > 0) {
-        setPrices(report.prices);
-        setSourceLabel(`CoflNet live, ${report.loaded} loaded${report.failed ? `, ${report.failed} failed` : ""}`);
-        setPriceStatus("ready");
-        if (!isBackground) setLoadingMessage("");
-        return;
-      }
-
-      const message = report.errors[0] ?? "CoflNet returned no shard snapshots.";
-      if (isBackground) {
-        setAutoRefreshEnabled(false);
-        setSourceLabel("CoflNet auto-refresh failed; disabled");
-        setPriceStatus("ready");
-        setLoadingMessage(`Auto-refresh failed and was turned off. First error: ${message}`);
-        return;
-      }
-
-      setApiToken("");
-      setAutoRefreshEnabled(false);
-      setSourceLabel("Awaiting CoflNet token");
-      setPriceStatus("error");
-      setTokenError(`CoflNet load failed. First error: ${message}`);
-      setLoadingMessage("");
-    } catch (error) {
-      if (loadSequenceRef.current !== loadSequence) return;
-      const message = error instanceof Error ? error.message : "Unable to load CoflNet prices.";
-      if (isBackground) {
-        setAutoRefreshEnabled(false);
-        setSourceLabel("CoflNet auto-refresh failed; disabled");
-        setPriceStatus("ready");
-        setLoadingMessage(`Auto-refresh failed and was turned off. ${message}`);
-        return;
-      }
-
-      setApiToken("");
-      setAutoRefreshEnabled(false);
-      setSourceLabel("Awaiting CoflNet token");
-      setPriceStatus("error");
-      setTokenError(message);
-      setLoadingMessage("");
-    } finally {
-      if (isBackground) {
-        backgroundRefreshInFlightRef.current = false;
-        setIsBackgroundRefreshing(false);
-      }
-    }
+    await runCurrentSnapshotRequest({
+      requestSequence: loadSequence,
+      getCurrentSequence: () => loadSequenceRef.current,
+      request: () => fetchHypixelShardPrices(recipeBook, controller.signal),
+      onSuccess: (report) => {
+        setSnapshotState((current) => applySnapshotReport(current, report));
+        setSourceLabel(formatSnapshotLabel(report));
+        setLoadingMessage(report.coverage.loaded < report.coverage.expected ? "Snapshot coverage is partial; unavailable or malformed products were excluded." : "");
+      },
+      onFailure: (error) => {
+        const message = error instanceof HypixelSnapshotError ? error.message : "Unable to load the Hypixel Bazaar snapshot";
+        setSnapshotState((current) => applySnapshotFailure(current, message));
+        setSourceLabel("Hypixel Bazaar snapshot unavailable or stale");
+        setLoadingMessage(message);
+      },
+      onSettled: () => {
+        requestControllerRef.current = null;
+        setIsRefreshing(false);
+      },
+    });
   }, [recipeBook]);
 
   useEffect(() => {
-    if (!autoRefreshEnabled || !apiToken || !recipeBook || priceStatus === "loading") return;
+    if (recipeBook) void loadBazaarSnapshot();
+  }, [loadBazaarSnapshot, recipeBook]);
 
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "hidden") return;
-      void loadLivePrices(apiToken, { background: true });
-    }, AUTO_REFRESH_INTERVAL_MS);
-
-    return () => window.clearInterval(timer);
-  }, [apiToken, autoRefreshEnabled, loadLivePrices, priceStatus, recipeBook]);
-
-  const submitToken = () => {
-    const token = tokenDraft.trim();
-    if (!token) {
-      setTokenError("Paste a CoflNet API token to load live Bazaar data.");
-      return;
-    }
-
-    setApiToken(token);
-    setTokenDraft("");
-    if (recipeBook) {
-      void loadLivePrices(token);
-    } else {
-      setPriceStatus("loading");
-      setLoadingMessage("Loading fusion graph...");
-    }
-  };
+  useEffect(() => () => requestControllerRef.current?.abort(), []);
 
   const profitableCount = rankedResults.filter((result) => result.profit > 0).length;
   const selectedShard = selected && recipeBook ? recipeBook.shards[selected.shardId] : null;
-  const showTokenGate = !apiToken && priceStatus !== "loading";
-  const isReady = priceStatus === "ready";
+  const isReady = snapshotState.status !== "unavailable";
   const loadSelectedIntoCraftTab = () => {
     if (!selected) return;
     setCraftTargetId(selected.shardId);
     setCraftQuantity(1);
     setActiveTab("craft");
-  };
-  const changeToken = () => {
-    loadSequenceRef.current += 1;
-    setApiToken("");
-    setTokenDraft("");
-    setAutoRefreshEnabled(false);
-    setShowAutoRefreshWarning(false);
-    setIsBackgroundRefreshing(false);
-    setPrices({});
-    setSelected(null);
-    setCraftTargetId(null);
-    setPriceStatus("awaiting-token");
-    setSourceLabel("Awaiting CoflNet token");
-    setLoadingMessage("");
   };
 
   return (
@@ -796,11 +657,11 @@ export const ProfitApp = () => {
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-xs font-medium text-amber-100">
               <ShieldCheck className="h-3.5 w-3.5" />
-              FlipShards live Bazaar profit calculator
+              FlipShards official Bazaar snapshot profit calculator
             </div>
             <h1 className="text-3xl font-semibold tracking-[-0.04em] text-stone-50 sm:text-5xl">FlipShards</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-400">
-              Live CoflNet market snapshots meet shard fusion math. Find profitable direct buys, recursive fusions, and custom craft plans.
+              Official Hypixel Bazaar snapshots meet SkyShards fusion math. Find profitable direct buys, recursive fusions, and custom craft plans.
             </p>
           </div>
           <div className="grid grid-cols-3 gap-2 rounded-md border border-stone-700/70 bg-stone-950/70 p-2 text-center shadow-2xl shadow-black/20">
@@ -813,7 +674,7 @@ export const ProfitApp = () => {
               <div className="text-xs text-stone-500">visible profit</div>
             </div>
             <div className="px-3 py-2">
-              <div className="status-pulse flex items-center justify-center gap-2 text-xl font-semibold text-cyan-200">{isReady ? "Live" : priceStatus === "loading" ? "Loading" : "Locked"}</div>
+              <div className="status-pulse flex items-center justify-center gap-2 text-xl font-semibold text-cyan-200">{isRefreshing ? "Loading" : isReady ? (snapshotState.status === "stale" ? "Stale" : "Snapshot") : "Unavailable"}</div>
               <div className="text-xs text-stone-500">prices</div>
             </div>
           </div>
@@ -896,51 +757,31 @@ export const ProfitApp = () => {
         </section>
         )}
 
-        {apiToken && (
+        {recipeBook && (
           <section className="glass-panel relative z-10 flex flex-wrap items-center justify-between gap-3 p-3">
-            <div className="text-sm text-stone-400">
-              CoflNet token is active in page memory only. Refreshing or closing this page clears it.
+            <div className="min-w-0 text-sm text-stone-400">
+              <div className="font-medium text-stone-200">{sourceLabel}</div>
+              {snapshotState.coverage && (
+                <div className="mt-1 text-xs text-stone-500">
+                  Coverage: {snapshotState.coverage.expected} expected, {snapshotState.coverage.matched} matched, {snapshotState.coverage.loaded} loaded, {snapshotState.coverage.missing} missing, {snapshotState.coverage.malformed} malformed.
+                </div>
+              )}
+              {snapshotState.lastUpdatedMs !== null && (
+                <div className="mt-1 text-xs text-stone-500">Official timestamp: {new Date(snapshotState.lastUpdatedMs).toISOString()}</div>
+              )}
+              {snapshotState.status === "stale" && <div className="mt-1 text-xs text-amber-200">Showing last valid snapshot. {snapshotState.errorMessage}</div>}
+              {snapshotState.status === "unavailable" && snapshotState.errorMessage && <div className="mt-1 text-xs text-red-200">Snapshot unavailable: {snapshotState.errorMessage}</div>}
+              <div className="mt-1 text-xs text-stone-500">Risk is a provisional heuristic based on official seven-day buy activity, not a CoflNet average.</div>
             </div>
-            <div className="flex flex-wrap items-start gap-2">
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  className="premium-button inline-flex h-10 items-center justify-center gap-2 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-4 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => void loadLivePrices(apiToken)}
-                  disabled={!recipeBook || priceStatus === "loading" || isBackgroundRefreshing}
-                >
-                  <RefreshCw className={`h-4 w-4 ${priceStatus === "loading" || isBackgroundRefreshing ? "animate-spin" : ""}`} />
-                  Reload CoflNet
-                </button>
-                <label className="flex max-w-xs cursor-pointer items-start gap-2 rounded-md border border-stone-700/80 bg-stone-950/60 px-3 py-2 text-xs text-stone-300 transition hover:border-stone-500/80">
-                  <input
-                    checked={autoRefreshEnabled}
-                    className="mt-0.5 h-4 w-4 accent-cyan-400"
-                    disabled={!apiToken}
-                    onChange={(event) => {
-                      if (event.target.checked) {
-                        setShowAutoRefreshWarning(true);
-                        return;
-                      }
-                      setAutoRefreshEnabled(false);
-                    }}
-                    type="checkbox"
-                  />
-                  <span>
-                    <span className="block font-medium text-stone-100">Automatically load data every 5 minutes</span>
-                    <span className="mt-1 block text-stone-500">Off by default. Requires confirmation because non-premium tokens may be rate limited.</span>
-                  </span>
-                </label>
-              </div>
-              <button
-                type="button"
-                className="premium-button inline-flex h-10 items-center justify-center rounded-md border border-stone-600 bg-stone-900 px-4 text-sm font-semibold text-stone-100 transition hover:bg-stone-800"
-                onClick={changeToken}
-                disabled={priceStatus === "loading"}
-              >
-                Change Token
-              </button>
-            </div>
+            <button
+              type="button"
+              className="premium-button inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-4 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => void loadBazaarSnapshot()}
+              disabled={!recipeBook || isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              Reload Bazaar Snapshot
+            </button>
           </section>
         )}
 
@@ -1028,6 +869,7 @@ export const ProfitApp = () => {
                             <Metric label="After Tax" value={formatCoins(selected.revenueAfterTax * selected.producedQuantity)} />
                             <Metric label="Produced" value={`${formatQuantity(selected.producedQuantity)}x`} />
                           </div>
+                          <MarketStats result={selected} />
                         </div>
                         <div className="tree-node flex items-center gap-2 px-3 py-2 text-xs text-stone-400">
                           <ArrowDownUp className="h-4 w-4 text-stone-300" />
@@ -1042,7 +884,7 @@ export const ProfitApp = () => {
                 </section>
               </>
             ) : craftTarget ? (
-              <CraftCalculations result={craftTarget} book={recipeBook} prices={prices} quantity={craftQuantity} onQuantityChange={setCraftQuantity} />
+              <CraftCalculations result={craftTarget} book={recipeBook} prices={snapshotState.prices} quantity={craftQuantity} onQuantityChange={setCraftQuantity} />
             ) : (
               <div className="surface-panel p-10 text-center text-sm text-stone-400">
                 Select a ranked opportunity, then load it into this tab to run custom craft calculations.
@@ -1051,34 +893,14 @@ export const ProfitApp = () => {
           </section>
         )}
 
-        {recipeBook && !isReady && !showTokenGate && (
+        {recipeBook && !isReady && (
           <div className="surface-panel p-8 text-center text-sm text-stone-400">
-            Live CoflNet data is loading. The calculator will unlock when enough Bazaar snapshots are ready.
+            The official Hypixel Bazaar snapshot is unavailable. The calculator will unlock after a valid snapshot is loaded.
           </div>
         )}
         </div>
       </main>
-      {showTokenGate && (
-        <TokenGate
-          disabled={!recipeBook}
-          error={tokenError || (recipeBook ? "" : "Loading fusion graph before connecting to CoflNet...")}
-          onSubmit={submitToken}
-          onTokenChange={setTokenDraft}
-          token={tokenDraft}
-        />
-      )}
-      {showAutoRefreshWarning && (
-        <AutoRefreshWarning
-          onCancel={() => {
-            setAutoRefreshEnabled(false);
-            setShowAutoRefreshWarning(false);
-          }}
-          onProceed={() => {
-            setAutoRefreshEnabled(true);
-            setShowAutoRefreshWarning(false);
-          }}
-        />
-      )}
+
     </>
   );
 };

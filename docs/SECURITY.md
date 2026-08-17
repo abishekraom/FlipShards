@@ -1,64 +1,21 @@
 # Security
 
-FlipShards requires a CoflNet API token to load live Bazaar data.
+FlipShards makes a direct browser request to the official Hypixel Bazaar snapshot endpoint. The initial implementation does not require or contain an API key, token, proxy, scheduled collector, or persistent market storage.
 
-## Token Handling
-
-- The token is entered through a startup modal.
-- The token is kept only in React page memory.
-- The token is not written to `localStorage` or `sessionStorage`.
-- The input field is cleared after submit.
-- Refreshing or closing the page clears the token.
-
-## Browser Limitation
-
-This is a client-side app:
+## Browser Request
 
 ```text
-browser -> CoflNet
+browser -> https://api.hypixel.net/v2/skyblock/bazaar
 ```
 
-The app avoids persistent storage and logging, but a browser-held token cannot be hidden from that same browser's developer tools while requests are being made.
+The request uses `credentials: omit`, normal browser cache behavior, an `Accept: application/json` header, and an AbortController timeout. It does not add cache-busting, automatic retries, or secrets. The raw response is not placed in React state, browser storage, or logs. Only the validated compact price map, timestamps, safe coverage metadata, and a safe error message are retained in page memory.
 
-For stronger protection, add a backend proxy:
+Google Fonts remain an unrelated external style dependency. If a stricter self-contained privacy posture is needed, replace the font import with self-hosted font files before deployment.
 
-```text
-browser -> FlipShards API -> CoflNet
-```
+## CSP and Console Hygiene
 
-## External Requests
+`vercel.json` permits only `https://api.hypixel.net` for the market request in `connect-src`; unrelated security headers and route rewrites remain unchanged. User-facing errors expose only a safe message and an HTTP status when applicable. Development diagnostics, if added later, must never include raw products, order summaries, response bodies, keys, or tokens.
 
-Production pages make browser requests to:
+## Upstream Changes
 
-- CoflNet, for live Bazaar snapshot data after the user enters a token.
-- Google Fonts, for the bundled visual design fonts.
-
-No CoflNet token is sent to Google Fonts. If a stricter self-contained privacy posture is needed, replace the font import with self-hosted font files before deployment.
-
-## Do Not Commit Tokens
-
-Never commit real tokens in:
-
-- source files
-- docs
-- screenshots
-- examples
-- issue text
-- pull request text
-
-Use placeholders:
-
-```text
-Authorization: Bearer <COFLNET_TOKEN>
-```
-
-## Rate Limiting
-
-FlipShards reduces CoflNet pressure by:
-
-- using low concurrency
-- retrying transient failures
-- respecting `Retry-After`
-- memory-caching snapshots briefly
-
-Avoid repeatedly pressing reload after a rate-limit response.
+CORS or authentication requirements can change. If the official endpoint begins requiring an API key, stop and review a separate secure integration rather than adding a browser secret or workaround. A failed request must remain visibly unavailable or stale.

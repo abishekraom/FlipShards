@@ -24,11 +24,15 @@ FlipShards normalizes each recipe into:
 
 ## Market Data
 
-Market data comes from CoflNet Bazaar snapshots. A CoflNet API token is required before the app unlocks.
+Market data comes from the official Hypixel Bazaar snapshot endpoint:
 
-The token is not stored in browser storage. Refreshing or closing the page clears it.
+```text
+https://api.hypixel.net/v2/skyblock/bazaar
+```
 
-Average weekly insta-buys from CoflNet are used for the risk badge. Rarity and type filters come from the local shard metadata, so they do not require an extra API.
+The app loads one snapshot after the fusion catalog is ready and supports manual reloads. See [Pricing And Profit](PRICING_AND_PROFIT.md) for the authoritative field mapping and activity heuristic, and [Architecture](ARCHITECTURE.md) for validation, coverage, atomic replacement, and stale-state behavior.
+
+Rarity and type filters come from the local shard metadata, so they do not require an extra API.
 
 ## Acquisition Tree
 

@@ -2,25 +2,24 @@
 
 FlipShards is a standalone Hypixel SkyBlock shard fusion profit calculator.
 
-It loads live Bazaar snapshot data from CoflNet, combines it with shard fusion recipe data, and ranks opportunities by profit, ROI, volume, and risk. It also includes a custom craft calculator for planning exact output quantities.
+It loads one official Hypixel Bazaar snapshot after the fusion catalog is ready, supports manual reloads, and ranks opportunities by profit, ROI, volume, and risk. It also includes a custom craft calculator for planning exact output quantities.
 
 ## Credits
 
 - **SkyShards**: source of the shard metadata and fusion recipe graph used in `public/fusion-data.json`.
-- **CoflNet**: source of live Bazaar snapshot price, volume, and moving-week market data.
+- **Hypixel Bazaar**: official source of the on-demand snapshot price, volume, and seven-day activity fields.
 
-FlipShards is a separate project and is not affiliated with, endorsed by, or maintained by SkyShards or CoflNet.
+FlipShards is a separate project and is not affiliated with, endorsed by, or maintained by Hypixel or SkyShards.
 
 ## Features
 
-- Live CoflNet-token-gated market loading.
-- No mock price mode.
-- Token is kept in page memory only and clears on refresh or close.
-- Optional 5-minute CoflNet auto-refresh, off by default.
+- One official Hypixel Bazaar snapshot request on initial load and on each manual reload, with no API key or token in the client.
+- Snapshot-only behavior: no timer, retry loop, persistent history, or CoflNet fallback.
+- Coverage and stale/unavailable status for partial or failed snapshots.
 - Fusion-aware optimizer that compares direct Bazaar acquisition against recursive shard fusion.
-- Ranked opportunities table with profit, ROI, cost, after-tax revenue, volume, average insta-buy data, and risk.
+- Ranked opportunities and result/craft details with profit, ROI, cost, after-tax revenue, separate buy and sell volumes, separate seven-day buy and sell activity, and risk.
 - Rarity and shard-type filters powered by the local fusion metadata.
-- Risk labels based on average weekly insta-buy activity.
+- Risk labels based on official seven-day buy activity as a provisional heuristic.
 - Acquisition tree for the selected shard.
 - Craft Calculations tab for custom output quantities.
 
@@ -53,7 +52,8 @@ pnpm run build
 ## Important Files
 
 - [src/profit/ProfitApp.tsx](src/profit/ProfitApp.tsx): main FlipShards UI
-- [src/profit/coflnet.ts](src/profit/coflnet.ts): CoflNet fetch and snapshot normalization
+- [src/profit/hypixel.ts](src/profit/hypixel.ts): validated official Bazaar snapshot adapter
+- [src/profit/snapshot-state.ts](src/profit/snapshot-state.ts): atomic snapshot and stale-state transitions
 - [src/profit/optimizer.ts](src/profit/optimizer.ts): recursive fusion-aware optimizer
 - [src/profit/recipes.ts](src/profit/recipes.ts): recipe normalization
 - [src/profit/types.ts](src/profit/types.ts): shared types
@@ -66,14 +66,3 @@ pnpm run build
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Security](docs/SECURITY.md)
-
-## Deployment Status
-
-This working copy has been detached from the original SkyShards remote. Wait to add a new `origin` until the FlipShards repository is created.
-
-When the new repository exists:
-
-```sh
-git remote add origin <NEW_REPO_URL>
-git push -u origin <branch>
-```

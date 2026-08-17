@@ -41,45 +41,55 @@ pnpm run build
 pnpm exec tsc -b
 ```
 
+## Test
+
+```sh
+pnpm test
+```
+
 ## Lint
 
 ```sh
 pnpm run lint
 ```
 
-## CoflNet Refresh Rate
+## Official Snapshot Loading
 
-The app can auto-refresh CoflNet data every 5 minutes, but the toggle is off by default.
+Each initial load and manual reload makes one browser request to `https://api.hypixel.net/v2/skyblock/bazaar`. The app uses normal browser cache behavior, no cache-busting, no automatic retry, and a bounded client timeout. It does not assert a Hypixel rate limit or update cadence.
 
-The CoflNet snapshot endpoint has returned rate-limit headers shaped like a per-minute budget. Normal manual loads use the faster loader, but enabling auto-refresh requires a confirmation warning because non-premium Cofl tokens may be rate limited or blocked.
+A valid partial snapshot is usable and reports expected, matched, loaded, missing, and malformed coverage. The currently observed catalog can be 320/321 because Rainbug is absent. A failed refresh keeps the previous valid map visible as stale; a failed first load remains unavailable. No API key, token, timer, persistent history, or CoflNet runtime fallback is used.
 
 ## Debugging
 
-If the app stays locked:
+If the app stays unavailable:
 
 - confirm `public/fusion-data.json` loaded
-- paste a valid CoflNet token into the modal
-- inspect browser Network requests for `401`, `403`, `429`, CORS, or no-content responses
+- inspect the snapshot status for the safe error message
+- inspect browser Network requests for HTTP, JSON, schema, timeout, or CORS failures
 
 If the table is empty:
 
 - lower minimum profit and volume filters
-- check whether CoflNet loaded all required shard snapshots
-- inspect the console for failed snapshot requests
+- check the visible snapshot coverage and whether the target is unavailable
+- inspect the console for CSP or unrelated application errors, never raw response payloads
 
 If prices look reversed:
 
 - read [Pricing And Profit](PRICING_AND_PROFIT.md)
-- remember that CoflNet `buyPrice` means buy-instantly price
-- remember that CoflNet `sellPrice` means sell-instantly price
+- verify `sellPrice` maps to Buy Order and Insta Sell
+- verify `buyPrice` maps to Insta Buy and Sell Order
 
-## Repository Setup
+## Local-versus-Deployed Parity Checklist
 
-This project is now intended to be pushed to a new FlipShards repository, not the original SkyShards remote.
+Run a production-equivalent local preview and compare it with the deployed app using the same browser, viewport, timezone, and static graph revision. Record pass/fail and the official snapshot timestamp. Live numbers need not equal the old source because source semantics and timestamps differ; fixed fixtures must match exactly.
 
-After the new repo is created:
-
-```sh
-git remote add origin <NEW_REPO_URL>
-git push -u origin <branch>
-```
+- Static graph: same 321 SkyShards catalog, names, recipes, fusion and craft trees.
+- Workflow: no token gate, one official request on initial load, then manual reload only.
+- Modes: `BUY_ORDER -> SELL_ORDER`, `BUY_ORDER -> INSTA_SELL`, `INSTA_BUY -> SELL_ORDER`, and `INSTA_BUY -> INSTA_SELL`.
+- Price direction: `sellPrice` for Buy Order/Insta Sell; `buyPrice` for Insta Buy/Sell Order.
+- Profit: profit, ROI, Bazaar tax, gross and after-tax revenue, and produced quantities.
+- Volume/liquidity: `sellVolume -> buyVolume`, `buyVolume -> sellVolume`, minimum-volume filter, and liquidity ranking.
+- Risk/activity: visible official seven-day labels and clearly provisional heuristic wording.
+- Coverage: 320/321 missing Rainbug is unavailable; no zero price or stale backfill; 321/321 fixture is accepted.
+- Failed refresh: prior values remain unchanged and are visibly stale; first-load failure remains unavailable.
+- Network/security: no per-item requests, no retry/timer, no API key or token, no raw payload logs, and no CSP violation for `api.hypixel.net`.

@@ -91,11 +91,10 @@ export class ProfitOptimizer {
       const acquisition = this.getBestAcquisition(shardId, settings.buyMode);
       const sellPrice = getSellRevenue(this.prices[shardId], settings.sellMode);
 
-      if (!acquisition.available || !acquisition.tree || sellPrice === null || !Number.isFinite(sellPrice)) {
+      const price = this.prices[shardId];
+      if (!price || !acquisition.available || !acquisition.tree || sellPrice === null || !Number.isFinite(sellPrice)) {
         continue;
       }
-
-      const price = this.prices[shardId];
       const revenueAfterTax = sellPrice * (1 - settings.taxRate);
       const executable = this.buildExecutablePlan(acquisition.tree, 1, settings.buyMode, revenueAfterTax);
 
@@ -105,9 +104,8 @@ export class ProfitOptimizer {
 
       const totalRevenueAfterTax = revenueAfterTax * executable.producedQuantity;
       const profit = totalRevenueAfterTax - executable.totalCost;
-      const volume = Math.min(price?.buyVolume ?? 0, price?.sellVolume ?? 0);
-      const averageInstaBuys = price?.averageInstaBuys ?? 0;
-      const averageInstaSells = price?.averageInstaSells ?? 0;
+      const volume = Math.min(price.buyVolume, price.sellVolume);
+      const { buyActivity7d, sellActivity7d } = price;
       const liquidityFactor = Math.min(1, volume / 25_000);
       const roi = executable.totalCost > 0 ? (profit / executable.totalCost) * 100 : 0;
 
@@ -123,12 +121,12 @@ export class ProfitOptimizer {
         revenueAfterTax,
         profit,
         roi,
-        buyVolume: price?.buyVolume ?? 0,
-        sellVolume: price?.sellVolume ?? 0,
-        averageInstaBuys,
-        averageInstaSells,
+        buyVolume: price.buyVolume,
+        sellVolume: price.sellVolume,
+        buyActivity7d,
+        sellActivity7d,
         liquidityScore: Math.max(0, profit) * Math.log(volume + 1) * liquidityFactor,
-        risk: this.classifyRisk(averageInstaBuys),
+        risk: this.classifyRisk(buyActivity7d),
         acquisitionTree: executable.tree,
       });
     }
@@ -222,11 +220,11 @@ export class ProfitOptimizer {
     return fusionPlan;
   }
 
-  private classifyRisk(averageInstaBuys: number): RiskLevel {
-    if (averageInstaBuys < 9_000) return "HIGH";
-    if (averageInstaBuys < 10_000) return "MEDIUM_HIGH";
-    if (averageInstaBuys < 20_000) return "MEDIUM";
-    if (averageInstaBuys < 22_000) return "MEDIUM_LOW";
+  private classifyRisk(buyActivity7d: number): RiskLevel {
+    if (buyActivity7d < 9_000) return "HIGH";
+    if (buyActivity7d < 10_000) return "MEDIUM_HIGH";
+    if (buyActivity7d < 20_000) return "MEDIUM";
+    if (buyActivity7d < 22_000) return "MEDIUM_LOW";
     return "LOW";
   }
 

@@ -8,8 +8,8 @@ FlipShards is a standalone Vite + React single-page app.
 public/fusion-data.json
   -> normalizeFusionData()
   -> RecipeBook
-  -> CoflNet token gate
-  -> CoflNet snapshots
+  -> one official Hypixel Bazaar snapshot request
+  -> validated compact price map and coverage state
   -> ShardPrice map
   -> ProfitOptimizer
   -> ProfitResult[]
@@ -18,8 +18,9 @@ public/fusion-data.json
 
 ## Modules
 
-- `src/profit/ProfitApp.tsx`: UI, token gate, filters, ranked table, acquisition tree, craft calculator.
-- `src/profit/coflnet.ts`: live CoflNet snapshot fetching, retry/backoff, memory cache, field normalization.
+- `src/profit/ProfitApp.tsx`: UI, snapshot status, filters, ranked table, acquisition tree, craft calculator.
+- `src/profit/hypixel.ts`: one official Hypixel Bazaar request, strict validation, action-side mapping, and compact snapshot normalization.
+- `src/profit/snapshot-state.ts`: atomic replacement and stale retention transitions.
 - `src/profit/optimizer.ts`: cheapest direct-or-fused acquisition search and profit ranking.
 - `src/profit/recipes.ts`: converts raw fusion data into normalized recipe inputs and output quantities.
 - `src/profit/types.ts`: shared app types.
@@ -40,8 +41,8 @@ until no costs change
 
 After costs stabilize, the acquisition tree is built by following the selected direct/fusion choices.
 
-## Client-Side Token Tradeoff
+## Snapshot Boundary
 
-FlipShards does not persist CoflNet tokens. The token is only held in page memory.
+The app performs one browser-side GET to the official Hypixel Bazaar endpoint after the fusion catalog loads and for each manual reload. It uses normal browser cache behavior, `credentials: omit`, an AbortController timeout, and no automatic retry. Raw responses are parsed locally and are not retained in React state, storage, or logs.
 
-Because requests are made from the browser, the active token is still visible to that browser's own developer tools while requests are in flight. A future backend proxy can hide the token from browser code if stronger protection is needed.
+A valid partial response replaces the active map atomically with its validated records. A transport, HTTP, timeout, JSON, schema, or zero-usable failure retains the previous in-memory map as stale. A first-load failure remains unavailable. There is no persistent history, scheduled refresh, server proxy, API key, or runtime CoflNet fallback.
