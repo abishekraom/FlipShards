@@ -412,6 +412,29 @@ const MarketStats = ({
   </div>
 );
 
+const DirectionalStatsCell = ({
+  buyLabel,
+  sellLabel,
+  buyValue,
+  sellValue,
+}: {
+  buyLabel: string;
+  sellLabel: string;
+  buyValue: number;
+  sellValue: number;
+}) => (
+  <div className="grid grid-cols-2 gap-2 text-right">
+    <div>
+      <div className="text-[10px] font-medium uppercase tracking-wide text-stone-500">{buyLabel}</div>
+      <div className="numeric text-stone-300">{formatCoins(buyValue)}</div>
+    </div>
+    <div>
+      <div className="text-[10px] font-medium uppercase tracking-wide text-stone-500">{sellLabel}</div>
+      <div className="numeric text-stone-300">{formatCoins(sellValue)}</div>
+    </div>
+  </div>
+);
+
 const ProfitTable = ({
   results,
   selected,
@@ -425,7 +448,7 @@ const ProfitTable = ({
 }) => (
   <div className="market-table overflow-hidden">
     <div className="max-h-[620px] overflow-auto">
-      <table className="w-full min-w-[1180px] text-left text-sm">
+      <table className="w-full min-w-[960px] text-left text-sm">
         <thead className="sticky top-0 z-10 bg-stone-950/95 text-xs uppercase tracking-wide text-stone-400 backdrop-blur">
           <tr>
             <th className="px-3 py-3">Shard</th>
@@ -433,10 +456,8 @@ const ProfitTable = ({
             <th className="px-3 py-3 text-right">ROI</th>
             <th className="px-3 py-3 text-right">Cost</th>
             <th className="px-3 py-3 text-right">After Tax</th>
-            <th className="px-3 py-3 text-right">Buy Volume</th>
-            <th className="px-3 py-3 text-right">Sell Volume</th>
-            <th className="px-3 py-3 text-right">7d Buy Activity</th>
-            <th className="px-3 py-3 text-right">7d Sell Activity</th>
+            <th className="px-3 py-3 text-right">Volume <span className="normal-case text-[10px]">(Buy / Sell)</span></th>
+            <th className="px-3 py-3 text-right">7d Activity <span className="normal-case text-[10px]">(Buy / Sell)</span></th>
             <th className="px-3 py-3">Risk</th>
           </tr>
         </thead>
@@ -459,10 +480,22 @@ const ProfitTable = ({
                 <td className="numeric px-3 py-3 text-right text-stone-200">{formatPercent(result.roi)}</td>
                 <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.totalCost)}</td>
                 <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.revenueAfterTax * result.producedQuantity)}</td>
-                <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.buyVolume)}</td>
-                <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.sellVolume)}</td>
-                <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.buyActivity7d)}</td>
-                <td className="numeric px-3 py-3 text-right text-stone-300">{formatCoins(result.sellActivity7d)}</td>
+                <td className="px-3 py-3">
+                  <DirectionalStatsCell
+                    buyLabel="Buy Volume"
+                    buyValue={result.buyVolume}
+                    sellLabel="Sell Volume"
+                    sellValue={result.sellVolume}
+                  />
+                </td>
+                <td className="px-3 py-3">
+                  <DirectionalStatsCell
+                    buyLabel="7d Buy Activity"
+                    buyValue={result.buyActivity7d}
+                    sellLabel="7d Sell Activity"
+                    sellValue={result.sellActivity7d}
+                  />
+                </td>
                 <td className="px-3 py-3">
                   <span className={`inline-flex rounded border px-2 py-1 text-xs font-medium ${riskStyles[result.risk]}`}>
                     {riskLabels[result.risk]}
