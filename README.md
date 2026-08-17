@@ -17,7 +17,7 @@ FlipShards is a separate project and is not affiliated with, endorsed by, or mai
 - Snapshot-only behavior: no timer, retry loop, persistent history, or CoflNet fallback.
 - Coverage and stale/unavailable status for partial or failed snapshots.
 - Fusion-aware optimizer that compares direct Bazaar acquisition against recursive shard fusion.
-- Ranked opportunities table with profit, ROI, cost, after-tax revenue, volume, official seven-day activity, and risk.
+- Ranked opportunities and result/craft details with profit, ROI, cost, after-tax revenue, separate buy and sell volumes, separate seven-day buy and sell activity, and risk.
 - Rarity and shard-type filters powered by the local fusion metadata.
 - Risk labels based on official seven-day buy activity as a provisional heuristic.
 - Acquisition tree for the selected shard.
